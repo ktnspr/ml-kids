@@ -1,5 +1,7 @@
 # Machine Learning AG - Materialien
 
+[![Clone in VS Code](https://img.shields.io/badge/Clone%20in-VS%20Code-blue?logo=visualstudiocode)](vscode://vscode.git/clone?url=https://github.com/ktnspr/ml-kids)
+
 Willkommen im Repository für unsere Schüler-AG (Klassenstufen 9-11).
 
 ## Über dieses Projekt
