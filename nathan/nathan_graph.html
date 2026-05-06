@@ -2,14 +2,15 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover">
 <title>Nathan der Weise - Beziehungsgraph (aus EPUB)</title>
 <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 <style>
-  html, body { margin: 0; padding: 0; height: 100%; font-family: Georgia, serif; background: #f5f1e8; color: #222; }
+  html, body { margin: 0; padding: 0; height: 100%; font-family: Georgia, serif; background: #f5f1e8; color: #222; -webkit-text-size-adjust: 100%; overscroll-behavior: none; }
   #header { padding: 12px 20px; background: #2c3e50; color: #fff; }
   #header h1 { margin: 0; font-size: 20px; }
   #header p { margin: 4px 0 0; font-size: 13px; opacity: 0.85; }
-  #network { width: 100%; height: calc(100vh - 70px); }
+  #network { width: 100%; height: calc(100vh - 70px); height: calc(100dvh - 70px); touch-action: none; }
   .legend {
     position: absolute; top: 90px; right: 20px;
     background: rgba(255,255,255,0.95); padding: 10px 14px;
@@ -33,7 +34,8 @@
     z-index: 10;
     color: #1a1a1a;
   }
-  #tooltip h3 { margin: 0 0 4px; font-size: 16px; color: #1a1a1a; }
+  #tooltip.pinned { pointer-events: auto; }
+  #tooltip h3 { margin: 0 0 4px; font-size: 16px; color: #1a1a1a; padding-right: 28px; }
   #tooltip .role { font-style: italic; color: #555; margin-bottom: 6px; }
   #tooltip .religion { display: inline-block; padding: 2px 8px; border-radius: 10px; color: #fff; font-size: 11px; margin-bottom: 8px; font-style: normal; }
   #tooltip .section-label { margin-top: 10px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #777; }
@@ -42,12 +44,41 @@
   #tooltip .timeline li::before { content: ''; position: absolute; left: -5px; top: 10px; width: 8px; height: 8px; background: #c9b88a; border-radius: 50%; }
   #tooltip .timeline .act { font-weight: bold; color: #6a4f1a; margin-right: 6px; }
   #tooltip .edge-kind { display: inline-block; padding: 2px 8px; border-radius: 10px; color: #fff; font-size: 11px; margin-bottom: 6px; }
+  #tooltip-close {
+    position: absolute; top: 6px; right: 6px;
+    width: 30px; height: 30px; border-radius: 50%;
+    border: none; background: #eee; color: #333;
+    font-size: 18px; line-height: 1; cursor: pointer; display: none;
+  }
+  #tooltip.pinned #tooltip-close { display: block; }
+  @media (max-width: 768px), (hover: none) {
+    #header { padding: 8px 12px; }
+    #header h1 { font-size: 15px; }
+    #header p { font-size: 11px; }
+    #network { height: calc(100vh - 56px); height: calc(100dvh - 56px); }
+    .legend {
+      top: auto; bottom: 8px; right: 8px; left: 8px;
+      display: flex; flex-wrap: wrap; gap: 4px 12px;
+      justify-content: center; padding: 6px 8px; font-size: 11px;
+    }
+    .legend div { margin: 0; }
+    #tooltip.mobile {
+      position: fixed; left: 0; right: 0; bottom: 0; top: auto;
+      max-width: none; width: 100%; max-height: 60vh; overflow-y: auto;
+      border-radius: 14px 14px 0 0; padding: 14px 16px calc(20px + env(safe-area-inset-bottom));
+      box-sizing: border-box;
+      box-shadow: 0 -6px 20px rgba(0,0,0,0.22);
+      pointer-events: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    #tooltip.mobile #tooltip-close { display: block; width: 36px; height: 36px; font-size: 20px; }
+  }
 </style>
 </head>
 <body>
 <div id="header">
   <h1>Nathan der Weise - Beziehungen der Figuren</h1>
-  <p>Extrahiert per Claude API aus dem EPUB. Hover ueber eine Figur fuer den Steckbrief.</p>
+  <p>Extrahiert per Claude API aus dem EPUB. Tippe oder hover ueber eine Figur fuer den Steckbrief.</p>
 </div>
 <div class="legend">
   <div><span class="swatch" style="background:#3498db"></span>Jude</div>
@@ -56,7 +87,7 @@
   <div><span class="swatch" style="background:#7f8c8d"></span>Unbekannt</div>
 </div>
 <div id="network"></div>
-<div id="tooltip"></div>
+<div id="tooltip"><button id="tooltip-close" aria-label="Schliessen">&times;</button><div id="tooltip-body"></div></div>
 <script>
 const DATA = {"nodes": [{"id": "nathan", "label": "Nathan", "color": "#3498db", "religion": "jude", "role": "Reicher jüdischer Kaufmann, 'der Weise'", "profile": "Nathan ist ein wohlhabender, weltgewandter Kaufmann in Jerusalem, der nach dem Verlust seiner Frau und seiner sieben Söhne durch ein christliches Pogrom das Christenkind Recha als seine Tochter angenommen und aufgezogen hat. Er verkörpert aufgeklärte Vernunft, Toleranz und Menschlichkeit über religiöse Grenzen hinweg. Mit seiner Ringparabel überzeugt er Saladin, mit seiner Güte den Tempelherrn. Am Ende stellt sich heraus, dass er all die Jahre die wahre Herkunft Rechas und des Tempelherrn bewahrt hat.", "timeline": [{"act": "I", "event": "Kehrt aus Babylon zurück und erfährt vom Hausbrand und der Rettung Rechas durch den Tempelherrn."}, {"act": "I-II", "event": "Versucht Recha von ihrem Engelsglauben zu heilen und trifft seinen Freund Al-Hafi, der nun Schatzmeister Saladins ist."}, {"act": "II", "event": "Spricht den Tempelherrn unter den Palmen an, dankt ihm und schließt Freundschaft; bemerkt dessen Ähnlichkeit mit Wolf von Stauffen."}, {"act": "III", "event": "Antwortet Saladin auf die Frage nach der wahren Religion mit der Ringparabel und bietet ihm Geld an."}, {"act": "IV", "event": "Erkennt im Klosterbruder den Reitknecht wieder, der ihm einst Recha brachte, und erhält das Brevier von Wolf von Filnek."}, {"act": "V", "event": "Enthüllt, dass der Tempelherr Rechas leiblicher Bruder und Sohn von Saladins Bruder Assad ist."}]}, {"id": "recha", "label": "Recha", "color": "#3498db", "religion": "jude", "role": "Nathans Pflegetochter, geborene Christin, leiblich Tochter Assads", "profile": "Recha ist die als Christenkind geborene, von Nathan jüdisch erzogene Pflegetochter. Anfangs schwärmerisch und vom Wunderglauben geprägt, entwickelt sie sich unter Nathans Anleitung zu einer aufgeklärten jungen Frau. Ihre Rettung aus dem Feuer durch den Tempelherrn löst die zentrale Handlung aus. Am Ende wird offenbart, dass sie Blanda von Filnek heißt, Tochter des verschollenen Assad und Schwester des Tempelherrn ist.", "timeline": [{"act": "I", "event": "Wird vom Tempelherrn aus dem brennenden Haus gerettet und glaubt an einen Engel."}, {"act": "II", "event": "Sehnt sich nach dem Tempelherrn und bittet Nathan, ihn aufzusuchen."}, {"act": "III", "event": "Begegnet dem Tempelherrn wieder und reflektiert nüchtern ihre Gefühle."}, {"act": "IV", "event": "Erfährt von Daja im verfallenen Christentempel, dass sie Christin und nicht Nathans leibliche Tochter ist."}, {"act": "V", "event": "Wirft sich Saladin zu Füßen und bittet, Nathan als Vater behalten zu dürfen."}, {"act": "V", "event": "Erkennt im Tempelherrn ihren Bruder und in Saladin und Sittah ihre Onkel und Tante."}]}, {"id": "tempelherr", "label": "Tempelherr (Curd/Leu von Filnek)", "color": "#c0392b", "religion": "christ", "role": "Junger Templer, Retter Rechas, leiblich Sohn Assads", "profile": "Der junge Tempelherr aus deutschem Geschlecht wurde als einziger von zwanzig Gefangenen von Saladin begnadigt, weil er dessen verschollenem Bruder Assad ähnelt. Stolz, schroff und voller christlicher Vorurteile, rettet er Recha aus dem Feuer und verliebt sich in sie. Im Konflikt zwischen Leidenschaft, Misstrauen und religiösem Eifer sucht er den Patriarchen auf und gefährdet damit Nathan. Am Ende erweist er sich als Leu von Filnek, Sohn Assads und Bruder Rechas.", "timeline": [{"act": "I", "event": "Wird von Saladin begnadigt und rettet kurz darauf Recha aus dem brennenden Haus."}, {"act": "II", "event": "Lehnt zunächst den Patriarchenauftrag gegen Saladin und Dajas Einladung schroff ab."}, {"act": "II", "event": "Schließt unter den Palmen Freundschaft mit Nathan und verspricht, Recha zu besuchen."}, {"act": "III", "event": "Verliebt sich bei der Begegnung mit Recha, bittet Nathan stürmisch um ihre Hand."}, {"act": "IV", "event": "Erfährt von Daja Rechas christliche Herkunft, sucht den Patriarchen auf und gefährdet Nathan."}, {"act": "IV", "event": "Wird von Saladin als Ebenbild Assads in Freundschaft angenommen."}, {"act": "V", "event": "Erkennt sich als Leu von Filnek, Sohn Assads und Bruder Rechas; fällt Saladin zu Füßen."}]}, {"id": "saladin", "label": "Saladin", "color": "#27ae60", "religion": "muslim", "role": "Sultan von Jerusalem", "profile": "Saladin ist der großzügige, freigebige, oft in Geldnöten steckende Sultan. Er begnadigte den Tempelherrn aus Trauer um seinen verschollenen Bruder Assad. Auf Sittahs Rat will er Nathan in eine Falle locken, lässt sich aber von dessen Ringparabel überzeugen und schließt mit ihm Freundschaft. Am Ende erkennt er in Tempelherr und Recha die Kinder seines Bruders Assad und nimmt sie als Neffen auf.", "timeline": [{"act": "I-II", "event": "Begnadigt den Tempelherrn wegen seiner Ähnlichkeit mit Bruder Assad."}, {"act": "II", "event": "Spielt Schach mit Sittah und plant, von Nathan Geld zu erlangen."}, {"act": "III", "event": "Stellt Nathan die Frage nach der wahren Religion und wird von der Ringparabel überzeugt."}, {"act": "IV", "event": "Empfängt den Tempelherrn als 'neuen Assad' und schenkt ihm Freiheit und Freundschaft."}, {"act": "V", "event": "Empfängt die Karawane aus Ägypten mit dem ersehnten Tribut."}, {"act": "V", "event": "Erkennt im Brevier die Handschrift seines Bruders Assad und nimmt Recha und den Tempelherrn als Neffen an."}]}, {"id": "sittah", "label": "Sittah", "color": "#27ae60", "religion": "muslim", "role": "Schwester Saladins, kluge Beraterin", "profile": "Sittah ist Saladins kluge, kritische und ihm tief verbundene Schwester. Sie gewinnt im Schach gegen ihn, finanziert heimlich seinen Hof aus eigenen Mitteln und schmiedet den Plan, Nathan mit der Religionsfrage in eine Falle zu locken. Sie zeigt Recha schwesterliche Wärme und tröstet sie. Am Ende erweist sie sich als Tante des Tempelherrn und Rechas.", "timeline": [{"act": "II", "event": "Gewinnt Schach gegen Saladin und schlägt vor, Geld bei Nathan zu borgen."}, {"act": "III", "event": "Plant gemeinsam mit Saladin die Falle und lauscht heimlich der Ringparabel."}, {"act": "IV", "event": "Findet das Bild Assads wieder und schlägt vor, Recha holen zu lassen."}, {"act": "V", "event": "Empfängt Recha schwesterlich im Harem und tröstet sie."}, {"act": "V", "event": "Begrüßt Tempelherr und Recha freudig als Nichte und Neffe."}]}, {"id": "daja", "label": "Daja", "color": "#c0392b", "religion": "christ", "role": "Christliche Gesellschafterin Rechas in Nathans Haus", "profile": "Daja, Witwe eines Schweizer Knechts aus Kaiser Friedrichs Heer, lebt als Gesellschafterin und Erzieherin Rechas in Nathans Haus. Sie verehrt Nathan, leidet aber unter Gewissensbissen, weil sie das Christenkind als Jüdin aufwachsen sieht. Aus religiösem Eifer und Sorge um Recha verrät sie schließlich dem Tempelherrn und Recha selbst das Geheimnis ihrer Herkunft.", "timeline": [{"act": "I", "event": "Empfängt Nathan und berichtet vom Hausbrand und der Rettung Rechas."}, {"act": "II", "event": "Spricht den Tempelherrn unter den Palmen an und wird schroff abgewiesen."}, {"act": "III", "event": "Streitet mit Recha über Glauben und Heimat und drängt auf Rückkehr zum Christentum."}, {"act": "IV", "event": "Verrät dem Tempelherrn Rechas christliche Herkunft."}, {"act": "V", "event": "Offenbart Recha auf dem Weg zu Sittah ihre wahre Herkunft."}]}, {"id": "al_hafi", "label": "Al-Hafi", "color": "#27ae60", "religion": "muslim", "role": "Derwisch und Schatzmeister Saladins, Freund Nathans", "profile": "Al-Hafi ist ein Derwisch vom Ganges, den Saladin zum Schatzmeister (Defterdar) ernannt hat. Er ist Nathans Freund und Schachgesell, freimütig und idealistisch. Saladins Geldverschwendung und das Borgen widerstreben ihm zutiefst. Am Ende kehrt er an den Ganges zu seinen Lehrern zurück.", "timeline": [{"act": "II", "event": "Trifft Nathan nach dessen Rückkehr und erzählt von seiner Ernennung zum Defterdar."}, {"act": "II", "event": "Bittet Nathan vergeblich um eine Kreditbeziehung zum Sultan."}, {"act": "III", "event": "Berichtet empört vom Schachspiel und fordert Nathan auf, mit ihm an den Ganges zu fliehen."}, {"act": "III", "event": "Verlässt Jerusalem und seinen Dienst bei Saladin."}]}, {"id": "klosterbruder", "label": "Klosterbruder (Bruder Bonafides)", "color": "#c0392b", "religion": "christ", "role": "Laienbruder im Dienst des Patriarchen", "profile": "Der Klosterbruder, ein einfacher, frommer Laienbruder, war früher Eremit auf Quarantana und davor Reitknecht des Wolf von Filnek. Er gehorcht dem Patriarchen widerwillig und ist Nathan herzlich zugetan. Er übergibt ihm das entscheidende Brevier und enthüllt damit die Herkunft Rechas und des Tempelherrn.", "timeline": [{"act": "II", "event": "Wird vom Patriarchen geschickt, den Tempelherrn als Spion zu gewinnen."}, {"act": "IV", "event": "Sucht Nathan auf und offenbart sich als der Reitknecht von vor 18 Jahren."}, {"act": "IV", "event": "Übergibt Nathan das Brevier des Wolf von Filnek mit den entscheidenden Familieneinträgen."}]}, {"id": "patriarch", "label": "Patriarch von Jerusalem", "color": "#c0392b", "religion": "christ", "role": "Oberhaupt der christlichen Kirche in Jerusalem", "profile": "Der Patriarch ist ein intriganter, machtbewusster Kirchenfürst, der politisch gegen Saladin agiert und religiösen Fanatismus verkörpert. Sein dreifaches 'Der Jude wird verbrannt!' macht ihn zur dunklen Gegenfigur Nathans. Er verfolgt Nathan, weil dieser ein Christenkind als Jüdin erzogen hat.", "timeline": [{"act": "II", "event": "Plant einen Anschlag auf Saladin und will den Tempelherrn als Werkzeug gewinnen."}, {"act": "IV", "event": "Hört den hypothetischen Fall und fordert die Verbrennung des Juden."}, {"act": "IV", "event": "Beauftragt den Klosterbruder, dem Juden auf die Spur zu kommen."}]}, {"id": "assad", "label": "Assad / Wolf von Filnek", "color": "#27ae60", "religion": "muslim", "role": "Verschollener Bruder Saladins, leiblicher Vater von Recha und Tempelherr", "profile": "Assad, Saladins besonders geliebter Bruder, verschwand vor über zwanzig Jahren. Er lebte als Wolf von Filnek unter Christen, heiratete eine Stauffin und zeugte zwei Kinder, Leu (den Tempelherrn) und Blanda (Recha). Er fiel bei Askalon. Sein Brevier mit arabischen Familieneinträgen löst am Ende das Identitätsrätsel.", "timeline": [{"act": "I-IV", "event": "Wird mehrfach als verschollener Bruder Saladins erwähnt, dem der Tempelherr ähnelt."}, {"act": "V", "event": "Wird durch das Brevier als Wolf von Filnek, Vater von Recha und Tempelherr, identifiziert."}]}], "edges": [{"id": "e0", "from": "nathan", "to": "recha", "label": "Pflegevater", "color": "#7f8c8d", "kind": "familie", "description": "Nathan zog Recha nach dem Tod seiner eigenen Familie als Christenkind zur Tochter auf. Diese tiefe Vater-Tochter-Bindung übersteht auch die Enthüllung ihrer wahren Herkunft."}, {"id": "e1", "from": "nathan", "to": "tempelherr", "label": "Freundschaft", "color": "#2980b9", "kind": "freundschaft", "description": "Aus anfänglichem Misstrauen wird unter den Palmen eine tiefe Freundschaft. Sie wird durch den Verdacht des Tempelherrn kurzzeitig erschüttert und am Ende durch die Familienenthüllung gefestigt."}, {"id": "e2", "from": "nathan", "to": "saladin", "label": "Freundschaft", "color": "#2980b9", "kind": "freundschaft", "description": "Saladin will Nathan zunächst Geld abringen, wird aber durch dessen Ringparabel überzeugt und bietet ihm Freundschaft an. Nathan stellt ihm sein Vermögen freiwillig zur Verfügung."}, {"id": "e3", "from": "nathan", "to": "al_hafi", "label": "Freund, Schachgesell", "color": "#2980b9", "kind": "freundschaft", "description": "Nathan und der Derwisch Al-Hafi sind alte Schach- und Geistesfreunde. Al-Hafi schätzt Nathans Weisheit und will ihn am Ende zur Flucht an den Ganges überreden."}, {"id": "e4", "from": "daja", "to": "nathan", "label": "im Dienst", "color": "#16a085", "kind": "dienst", "description": "Daja lebt seit Jahren in Nathans Haus und ist ihm dankbar verpflichtet, leidet aber an Gewissensnöten wegen seiner Erziehung Rechas und verrät schließlich sein Geheimnis."}, {"id": "e5", "from": "daja", "to": "recha", "label": "Erzieherin", "color": "#16a085", "kind": "dienst", "description": "Als Christin erzog Daja die heimlich getaufte Recha im jüdischen Haus Nathans. Sie drängt Recha zur Rückkehr zum Christentum und enthüllt ihr schließlich die wahre Herkunft."}, {"id": "e6", "from": "tempelherr", "to": "recha", "label": "Retter, dann Bruder", "color": "#7f8c8d", "kind": "familie", "description": "Der Tempelherr rettet Recha aus dem Feuer und verliebt sich leidenschaftlich in sie. Am Ende erweist sich, dass sie Geschwister sind, was die Liebe in geschwisterliche Zuneigung verwandelt."}, {"id": "e7", "from": "saladin", "to": "tempelherr", "label": "Onkel, begnadigt", "color": "#7f8c8d", "kind": "familie", "description": "Saladin begnadigte den Tempelherrn wegen dessen Ähnlichkeit mit Bruder Assad und nahm ihn in Freundschaft an. Am Ende stellt sich heraus, dass der Tempelherr tatsächlich Assads Sohn und damit sein Neffe ist."}, {"id": "e8", "from": "saladin", "to": "sittah", "label": "Bruder", "color": "#7f8c8d", "kind": "familie", "description": "Saladin und Sittah sind eng verbundene Geschwister. Sittah berät ihn klug, finanziert heimlich seinen Hof und ist an allen wichtigen Entscheidungen beteiligt."}, {"id": "e9", "from": "saladin", "to": "assad", "label": "Bruder", "color": "#7f8c8d", "kind": "familie", "description": "Assad war Saladins besonders geliebter, vor über zwanzig Jahren verschollener Bruder. Sein Andenken prägt Saladins Begnadigung des Tempelherrn und die finale Familienzusammenführung."}, {"id": "e10", "from": "sittah", "to": "recha", "label": "Tante", "color": "#7f8c8d", "kind": "familie", "description": "Sittah empfängt Recha im Harem mit schwesterlicher Wärme und tröstet sie in ihrer Verzweiflung. Am Ende stellt sich heraus, dass sie Rechas leibliche Tante ist."}, {"id": "e11", "from": "sittah", "to": "tempelherr", "label": "Tante", "color": "#7f8c8d", "kind": "familie", "description": "Als Schwester Assads erweist sich Sittah am Ende als Tante des Tempelherrn und begrüßt ihn freudig als Neffen."}, {"id": "e12", "from": "al_hafi", "to": "saladin", "label": "Schatzmeister", "color": "#16a085", "kind": "dienst", "description": "Al-Hafi ist als Derwisch zum Defterdar Saladins ernannt worden. Saladins ständige Geldverschwendung treibt ihn schließlich zur Aufgabe des Amtes und zur Rückkehr an den Ganges."}, {"id": "e13", "from": "tempelherr", "to": "saladin", "label": "Gefolgschaft", "color": "#2980b9", "kind": "freundschaft", "description": "Der Tempelherr verdankt Saladin sein Leben und schließt mit ihm einen Freundschaftsbund. Saladin sieht in ihm das Ebenbild seines Bruders Assad."}, {"id": "e14", "from": "patriarch", "to": "nathan", "label": "Verfolger", "color": "#c0392b", "kind": "konflikt", "description": "Der Patriarch sieht in Nathans Erziehung des Christenkindes Recha eine Todsünde und fordert kompromisslos seine Verbrennung. Er verkörpert den fanatischen Gegenpol zu Nathans Toleranz."}, {"id": "e15", "from": "patriarch", "to": "tempelherr", "label": "will ihn nutzen", "color": "#c0392b", "kind": "konflikt", "description": "Der Patriarch versucht den Tempelherrn als Spion gegen Saladin und später als Zeugen gegen Nathan zu instrumentalisieren. Der Tempelherr lehnt das Werkzeug-Sein angewidert ab."}, {"id": "e16", "from": "patriarch", "to": "klosterbruder", "label": "Vorgesetzter", "color": "#16a085", "kind": "dienst", "description": "Der Patriarch erteilt dem einfachen Laienbruder Bonafides immer wieder politische und intrigante Aufträge, die diesem zuwider sind."}, {"id": "e17", "from": "klosterbruder", "to": "nathan", "label": "brachte Recha", "color": "#95a5a6", "kind": "sonstige", "description": "Als ehemaliger Reitknecht Wolfs von Filnek übergab der Klosterbruder Nathan vor 18 Jahren das Säuglingskind Recha. Mit dem Brevier liefert er später den entscheidenden Beweis ihrer Herkunft."}, {"id": "e18", "from": "assad", "to": "recha", "label": "leiblicher Vater", "color": "#7f8c8d", "kind": "familie", "description": "Assad lebte als Wolf von Filnek unter Christen und war Rechas (eigentlich Blandas) leiblicher Vater. Sein Brevier offenbart die familiären Zusammenhänge."}, {"id": "e19", "from": "assad", "to": "tempelherr", "label": "leiblicher Vater", "color": "#7f8c8d", "kind": "familie", "description": "Assad alias Wolf von Filnek ist auch der leibliche Vater des Tempelherrn (Leu von Filnek). Die familiäre Wahrheit erklärt rückwirkend Saladins Begnadigung."}, {"id": "e20", "from": "nathan", "to": "assad", "label": "Freund", "color": "#2980b9", "kind": "freundschaft", "description": "Nathan war mit Wolf von Filnek (Assad) befreundet, der ihm mehrfach das Leben rettete. Aus Dankbarkeit nahm er dessen Tochter als eigene an."}, {"id": "e21", "from": "recha", "to": "tempelherr", "label": "Schwester", "color": "#7f8c8d", "kind": "familie", "description": "Recha verehrt den Tempelherrn zunächst als rettenden Engel und entwickelt Liebe zu ihm. Die Schlussenthüllung zeigt, dass sie seine leibliche Schwester ist."}]};
 
@@ -94,60 +125,122 @@ const edges = new vis.DataSet(DATA.edges.map(e => ({
   _meta: e
 })));
 
+const isTouchLike = () => window.matchMedia('(hover: none)').matches || window.innerWidth <= 768;
+
 const network = new vis.Network(
   document.getElementById('network'),
   { nodes, edges },
   {
-    nodes: { shape: 'dot', size: 22, borderWidth: 2 },
+    nodes: { shape: 'dot', size: isTouchLike() ? 18 : 22, borderWidth: 2 },
     physics: { barnesHut: { gravitationalConstant: -9000, springLength: 170 }, stabilization: { iterations: 250 } },
-    interaction: { hover: true, tooltipDelay: 0, hoverConnectedEdges: false }
+    interaction: {
+      hover: true,
+      tooltipDelay: 0,
+      hoverConnectedEdges: false,
+      dragView: true,
+      zoomView: true,
+      multiselect: false
+    }
   }
 );
 
 const tooltip = document.getElementById('tooltip');
+const tooltipBody = document.getElementById('tooltip-body');
+const tooltipClose = document.getElementById('tooltip-close');
+let tipPinned = false;
 
-function showNodeTip(meta) {
+function placeTooltip(clientX, clientY) {
+  if (isTouchLike()) {
+    tooltip.classList.add('mobile');
+    tooltip.style.left = '';
+    tooltip.style.top = '';
+    return;
+  }
+  tooltip.classList.remove('mobile');
+  if (clientX == null) return;
+  const x = Math.min(clientX + 16, window.innerWidth - tooltip.offsetWidth - 10);
+  const y = Math.min(clientY + 16, window.innerHeight - tooltip.offsetHeight - 10);
+  tooltip.style.left = x + 'px';
+  tooltip.style.top = y + 'px';
+}
+
+function closeTooltip() {
+  tooltip.style.display = 'none';
+  tooltip.classList.remove('pinned');
+  tipPinned = false;
+}
+
+function renderNodeTip(meta) {
   const tl = (meta.timeline || []).map(t =>
     `<li><span class="act">${t.act || ''}</span>${t.event || ''}</li>`
   ).join('');
-  tooltip.innerHTML = `
+  tooltipBody.innerHTML = `
     <h3>${meta.label}</h3>
     <div class="religion" style="background:${meta.color}">${RELIGION_LABEL[meta.religion] || meta.religion}</div>
     <div class="role">${meta.role || ''}</div>
     <div>${meta.profile || ''}</div>
     ${tl ? `<div class="section-label">Entwicklung</div><ul class="timeline">${tl}</ul>` : ''}
   `;
-  tooltip.style.display = 'block';
 }
 
-function showEdgeTip(meta) {
+function renderEdgeTip(meta) {
   const fromName = (nodes.get(meta.from) || {}).label || meta.from;
   const toName = (nodes.get(meta.to) || {}).label || meta.to;
   const kindColor = KIND_COLOR[meta.kind] || '#95a5a6';
-  tooltip.innerHTML = `
+  tooltipBody.innerHTML = `
     <h3>${fromName} &rarr; ${toName}</h3>
     <div class="edge-kind" style="background:${kindColor}">${KIND_LABEL[meta.kind] || meta.kind}</div>
     <div class="role">${meta.label || ''}</div>
     <div>${meta.description || ''}</div>
   `;
-  tooltip.style.display = 'block';
 }
 
-network.on('hoverNode', params => showNodeTip(nodes.get(params.node)._meta));
-network.on('blurNode', () => { tooltip.style.display = 'none'; });
-network.on('hoverEdge', params => {
-  const edge = edges.get(params.edge);
-  if (edge && edge._meta) showEdgeTip(edge._meta);
+function showTip(renderFn, pinned, pointer) {
+  renderFn();
+  tooltip.style.display = 'block';
+  tipPinned = pinned;
+  tooltip.classList.toggle('pinned', pinned);
+  placeTooltip(pointer && pointer.clientX, pointer && pointer.clientY);
+}
+
+network.on('hoverNode', params => {
+  if (tipPinned || isTouchLike()) return;
+  const meta = nodes.get(params.node)._meta;
+  showTip(() => renderNodeTip(meta), false, params.event && params.event.center);
 });
-network.on('blurEdge', () => { tooltip.style.display = 'none'; });
+network.on('blurNode', () => { if (!tipPinned) tooltip.style.display = 'none'; });
+network.on('hoverEdge', params => {
+  if (tipPinned || isTouchLike()) return;
+  const edge = edges.get(params.edge);
+  if (edge && edge._meta) showTip(() => renderEdgeTip(edge._meta), false, params.event && params.event.center);
+});
+network.on('blurEdge', () => { if (!tipPinned) tooltip.style.display = 'none'; });
+
+network.on('click', params => {
+  const pointer = params.pointer && params.pointer.DOM
+    ? { clientX: params.pointer.DOM.x, clientY: params.pointer.DOM.y }
+    : null;
+  if (params.nodes && params.nodes.length) {
+    const meta = nodes.get(params.nodes[0])._meta;
+    showTip(() => renderNodeTip(meta), true, pointer);
+  } else if (params.edges && params.edges.length) {
+    const edge = edges.get(params.edges[0]);
+    if (edge && edge._meta) showTip(() => renderEdgeTip(edge._meta), true, pointer);
+  } else {
+    closeTooltip();
+  }
+});
+
+tooltipClose.addEventListener('click', e => { e.stopPropagation(); closeTooltip(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeTooltip(); });
 
 document.addEventListener('mousemove', e => {
-  if (tooltip.style.display === 'block') {
-    const x = Math.min(e.clientX + 16, window.innerWidth - tooltip.offsetWidth - 10);
-    const y = Math.min(e.clientY + 16, window.innerHeight - tooltip.offsetHeight - 10);
-    tooltip.style.left = x + 'px';
-    tooltip.style.top = y + 'px';
-  }
+  if (tipPinned || isTouchLike()) return;
+  if (tooltip.style.display === 'block') placeTooltip(e.clientX, e.clientY);
+});
+
+window.addEventListener('resize', () => {
+  if (tooltip.style.display === 'block') placeTooltip();
 });
 </script>
 </body>
