@@ -7,7 +7,13 @@
 <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 <style>
   html, body { margin: 0; padding: 0; height: 100%; font-family: Georgia, serif; background: #f5f1e8; color: #222; -webkit-text-size-adjust: 100%; overscroll-behavior: none; }
-  #header { padding: 12px 20px; background: #2c3e50; color: #fff; }
+  #header {
+    padding: 12px 20px;
+    padding-top: max(12px, env(safe-area-inset-top));
+    padding-left: max(20px, env(safe-area-inset-left));
+    padding-right: max(20px, env(safe-area-inset-right));
+    background: #2c3e50; color: #fff;
+  }
   #header h1 { margin: 0; font-size: 20px; }
   #header p { margin: 4px 0 0; font-size: 13px; opacity: 0.85; }
   #network { width: 100%; height: calc(100vh - 70px); height: calc(100dvh - 70px); touch-action: none; }
@@ -52,26 +58,37 @@
   }
   #tooltip.pinned #tooltip-close { display: block; }
   @media (max-width: 768px), (hover: none) {
-    #header { padding: 8px 12px; }
+    #header {
+      padding: 8px 12px;
+      padding-top: max(8px, env(safe-area-inset-top));
+      padding-left: max(12px, env(safe-area-inset-left));
+      padding-right: max(12px, env(safe-area-inset-right));
+    }
     #header h1 { font-size: 15px; }
     #header p { font-size: 11px; }
     #network { height: calc(100vh - 56px); height: calc(100dvh - 56px); }
     .legend {
-      top: auto; bottom: 8px; right: 8px; left: 8px;
+      top: auto; right: 8px; left: 8px;
+      bottom: max(8px, env(safe-area-inset-bottom));
       display: flex; flex-wrap: wrap; gap: 4px 12px;
       justify-content: center; padding: 6px 8px; font-size: 11px;
     }
     .legend div { margin: 0; }
     #tooltip.mobile {
       position: fixed; left: 0; right: 0; bottom: 0; top: auto;
-      max-width: none; width: 100%; max-height: 60vh; overflow-y: auto;
-      border-radius: 14px 14px 0 0; padding: 14px 16px calc(20px + env(safe-area-inset-bottom));
+      max-width: none; width: 100%; max-height: 70vh; overflow-y: auto;
+      border-radius: 14px 14px 0 0;
+      padding: 14px max(16px, env(safe-area-inset-right)) calc(20px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
       box-sizing: border-box;
       box-shadow: 0 -6px 20px rgba(0,0,0,0.22);
       pointer-events: auto;
       -webkit-overflow-scrolling: touch;
+      font-size: 14px;
     }
-    #tooltip.mobile #tooltip-close { display: block; width: 36px; height: 36px; font-size: 20px; }
+    #tooltip.mobile h3 { font-size: 17px; padding-right: 40px; }
+    #tooltip.mobile #tooltip-close { display: block; width: 40px; height: 40px; font-size: 22px; top: 8px; right: 8px; }
+    /* Legende ausblenden, wenn Tooltip geoeffnet ist - sonst Platzkonflikt */
+    body.tip-open .legend { display: none; }
   }
 </style>
 </head>
@@ -103,9 +120,12 @@ const KIND_COLOR = {
   "konflikt": "#c0392b", "dienst": "#16a085", "religion": "#8e44ad", "sonstige": "#95a5a6"
 };
 
+const isTouchLike = () => window.matchMedia('(hover: none)').matches || window.innerWidth <= 768;
+const TOUCH = isTouchLike();
+
 const nodes = new vis.DataSet(DATA.nodes.map(n => ({
   id: n.id, label: n.label, color: { background: n.color, border: '#222' },
-  font: { color: '#fff', size: 15, face: 'Georgia', strokeColor: '#000', strokeWidth: 2 },
+  font: { color: '#fff', size: TOUCH ? 16 : 15, face: 'Georgia', strokeColor: '#000', strokeWidth: 2 },
   _meta: n
 })));
 
@@ -113,7 +133,7 @@ const edges = new vis.DataSet(DATA.edges.map(e => ({
   id: e.id, from: e.from, to: e.to, label: e.label,
   color: { color: e.color, highlight: e.color, hover: '#222' },
   font: {
-    size: 12, face: 'Georgia', color: '#1a1a1a',
+    size: TOUCH ? 13 : 12, face: 'Georgia', color: '#1a1a1a',
     strokeColor: '#ffffff', strokeWidth: 4,
     align: 'middle'
   },
@@ -125,13 +145,11 @@ const edges = new vis.DataSet(DATA.edges.map(e => ({
   _meta: e
 })));
 
-const isTouchLike = () => window.matchMedia('(hover: none)').matches || window.innerWidth <= 768;
-
 const network = new vis.Network(
   document.getElementById('network'),
   { nodes, edges },
   {
-    nodes: { shape: 'dot', size: isTouchLike() ? 18 : 22, borderWidth: 2 },
+    nodes: { shape: 'dot', size: TOUCH ? 24 : 22, borderWidth: 2 },
     physics: { barnesHut: { gravitationalConstant: -9000, springLength: 170 }, stabilization: { iterations: 250 } },
     interaction: {
       hover: true,
@@ -167,6 +185,7 @@ function placeTooltip(clientX, clientY) {
 function closeTooltip() {
   tooltip.style.display = 'none';
   tooltip.classList.remove('pinned');
+  document.body.classList.remove('tip-open');
   tipPinned = false;
 }
 
@@ -200,6 +219,7 @@ function showTip(renderFn, pinned, pointer) {
   tooltip.style.display = 'block';
   tipPinned = pinned;
   tooltip.classList.toggle('pinned', pinned);
+  document.body.classList.toggle('tip-open', pinned && isTouchLike());
   placeTooltip(pointer && pointer.clientX, pointer && pointer.clientY);
 }
 

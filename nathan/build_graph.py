@@ -271,14 +271,21 @@ def build_html(data: dict) -> str:
 <html lang="de">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover">
 <title>Nathan der Weise - Beziehungsgraph (aus EPUB)</title>
 <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 <style>
-  html, body {{ margin: 0; padding: 0; height: 100%; font-family: Georgia, serif; background: #f5f1e8; color: #222; }}
-  #header {{ padding: 12px 20px; background: #2c3e50; color: #fff; }}
+  html, body {{ margin: 0; padding: 0; height: 100%; font-family: Georgia, serif; background: #f5f1e8; color: #222; -webkit-text-size-adjust: 100%; overscroll-behavior: none; }}
+  #header {{
+    padding: 12px 20px;
+    padding-top: max(12px, env(safe-area-inset-top));
+    padding-left: max(20px, env(safe-area-inset-left));
+    padding-right: max(20px, env(safe-area-inset-right));
+    background: #2c3e50; color: #fff;
+  }}
   #header h1 {{ margin: 0; font-size: 20px; }}
   #header p {{ margin: 4px 0 0; font-size: 13px; opacity: 0.85; }}
-  #network {{ width: 100%; height: calc(100vh - 70px); }}
+  #network {{ width: 100%; height: calc(100vh - 70px); height: calc(100dvh - 70px); touch-action: none; }}
   .legend {{
     position: absolute; top: 90px; right: 20px;
     background: rgba(255,255,255,0.95); padding: 10px 14px;
@@ -302,7 +309,8 @@ def build_html(data: dict) -> str:
     z-index: 10;
     color: #1a1a1a;
   }}
-  #tooltip h3 {{ margin: 0 0 4px; font-size: 16px; color: #1a1a1a; }}
+  #tooltip.pinned {{ pointer-events: auto; }}
+  #tooltip h3 {{ margin: 0 0 4px; font-size: 16px; color: #1a1a1a; padding-right: 28px; }}
   #tooltip .role {{ font-style: italic; color: #555; margin-bottom: 6px; }}
   #tooltip .religion {{ display: inline-block; padding: 2px 8px; border-radius: 10px; color: #fff; font-size: 11px; margin-bottom: 8px; font-style: normal; }}
   #tooltip .section-label {{ margin-top: 10px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #777; }}
@@ -311,12 +319,52 @@ def build_html(data: dict) -> str:
   #tooltip .timeline li::before {{ content: ''; position: absolute; left: -5px; top: 10px; width: 8px; height: 8px; background: #c9b88a; border-radius: 50%; }}
   #tooltip .timeline .act {{ font-weight: bold; color: #6a4f1a; margin-right: 6px; }}
   #tooltip .edge-kind {{ display: inline-block; padding: 2px 8px; border-radius: 10px; color: #fff; font-size: 11px; margin-bottom: 6px; }}
+  #tooltip-close {{
+    position: absolute; top: 6px; right: 6px;
+    width: 30px; height: 30px; border-radius: 50%;
+    border: none; background: #eee; color: #333;
+    font-size: 18px; line-height: 1; cursor: pointer; display: none;
+  }}
+  #tooltip.pinned #tooltip-close {{ display: block; }}
+  @media (max-width: 768px), (hover: none) {{
+    #header {{
+      padding: 8px 12px;
+      padding-top: max(8px, env(safe-area-inset-top));
+      padding-left: max(12px, env(safe-area-inset-left));
+      padding-right: max(12px, env(safe-area-inset-right));
+    }}
+    #header h1 {{ font-size: 15px; }}
+    #header p {{ font-size: 11px; }}
+    #network {{ height: calc(100vh - 56px); height: calc(100dvh - 56px); }}
+    .legend {{
+      top: auto; right: 8px; left: 8px;
+      bottom: max(8px, env(safe-area-inset-bottom));
+      display: flex; flex-wrap: wrap; gap: 4px 12px;
+      justify-content: center; padding: 6px 8px; font-size: 11px;
+    }}
+    .legend div {{ margin: 0; }}
+    #tooltip.mobile {{
+      position: fixed; left: 0; right: 0; bottom: 0; top: auto;
+      max-width: none; width: 100%; max-height: 70vh; overflow-y: auto;
+      border-radius: 14px 14px 0 0;
+      padding: 14px max(16px, env(safe-area-inset-right)) calc(20px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+      box-sizing: border-box;
+      box-shadow: 0 -6px 20px rgba(0,0,0,0.22);
+      pointer-events: auto;
+      -webkit-overflow-scrolling: touch;
+      font-size: 14px;
+    }}
+    #tooltip.mobile h3 {{ font-size: 17px; padding-right: 40px; }}
+    #tooltip.mobile #tooltip-close {{ display: block; width: 40px; height: 40px; font-size: 22px; top: 8px; right: 8px; }}
+    /* Legende ausblenden, wenn Tooltip geoeffnet ist - sonst Platzkonflikt */
+    body.tip-open .legend {{ display: none; }}
+  }}
 </style>
 </head>
 <body>
 <div id="header">
   <h1>Nathan der Weise - Beziehungen der Figuren</h1>
-  <p>Extrahiert per Claude API aus dem EPUB. Hover ueber eine Figur fuer den Steckbrief.</p>
+  <p>Extrahiert per Claude API aus dem EPUB. Tippe oder hover ueber eine Figur fuer den Steckbrief.</p>
 </div>
 <div class="legend">
   <div><span class="swatch" style="background:#3498db"></span>Jude</div>
@@ -325,7 +373,7 @@ def build_html(data: dict) -> str:
   <div><span class="swatch" style="background:#7f8c8d"></span>Unbekannt</div>
 </div>
 <div id="network"></div>
-<div id="tooltip"></div>
+<div id="tooltip"><button id="tooltip-close" aria-label="Schliessen">&times;</button><div id="tooltip-body"></div></div>
 <script>
 const DATA = {payload};
 
@@ -341,9 +389,12 @@ const KIND_COLOR = {{
   "konflikt": "#c0392b", "dienst": "#16a085", "religion": "#8e44ad", "sonstige": "#95a5a6"
 }};
 
+const isTouchLike = () => window.matchMedia('(hover: none)').matches || window.innerWidth <= 768;
+const TOUCH = isTouchLike();
+
 const nodes = new vis.DataSet(DATA.nodes.map(n => ({{
   id: n.id, label: n.label, color: {{ background: n.color, border: '#222' }},
-  font: {{ color: '#fff', size: 15, face: 'Georgia', strokeColor: '#000', strokeWidth: 2 }},
+  font: {{ color: '#fff', size: TOUCH ? 16 : 15, face: 'Georgia', strokeColor: '#000', strokeWidth: 2 }},
   _meta: n
 }})));
 
@@ -351,7 +402,7 @@ const edges = new vis.DataSet(DATA.edges.map(e => ({{
   id: e.id, from: e.from, to: e.to, label: e.label,
   color: {{ color: e.color, highlight: e.color, hover: '#222' }},
   font: {{
-    size: 12, face: 'Georgia', color: '#1a1a1a',
+    size: TOUCH ? 13 : 12, face: 'Georgia', color: '#1a1a1a',
     strokeColor: '#ffffff', strokeWidth: 4,
     align: 'middle'
   }},
@@ -367,56 +418,118 @@ const network = new vis.Network(
   document.getElementById('network'),
   {{ nodes, edges }},
   {{
-    nodes: {{ shape: 'dot', size: 22, borderWidth: 2 }},
+    nodes: {{ shape: 'dot', size: TOUCH ? 24 : 22, borderWidth: 2 }},
     physics: {{ barnesHut: {{ gravitationalConstant: -9000, springLength: 170 }}, stabilization: {{ iterations: 250 }} }},
-    interaction: {{ hover: true, tooltipDelay: 0, hoverConnectedEdges: false }}
+    interaction: {{
+      hover: true,
+      tooltipDelay: 0,
+      hoverConnectedEdges: false,
+      dragView: true,
+      zoomView: true,
+      multiselect: false
+    }}
   }}
 );
 
 const tooltip = document.getElementById('tooltip');
+const tooltipBody = document.getElementById('tooltip-body');
+const tooltipClose = document.getElementById('tooltip-close');
+let tipPinned = false;
 
-function showNodeTip(meta) {{
+function placeTooltip(clientX, clientY) {{
+  if (isTouchLike()) {{
+    tooltip.classList.add('mobile');
+    tooltip.style.left = '';
+    tooltip.style.top = '';
+    return;
+  }}
+  tooltip.classList.remove('mobile');
+  if (clientX == null) return;
+  const x = Math.min(clientX + 16, window.innerWidth - tooltip.offsetWidth - 10);
+  const y = Math.min(clientY + 16, window.innerHeight - tooltip.offsetHeight - 10);
+  tooltip.style.left = x + 'px';
+  tooltip.style.top = y + 'px';
+}}
+
+function closeTooltip() {{
+  tooltip.style.display = 'none';
+  tooltip.classList.remove('pinned');
+  document.body.classList.remove('tip-open');
+  tipPinned = false;
+}}
+
+function renderNodeTip(meta) {{
   const tl = (meta.timeline || []).map(t =>
     `<li><span class="act">${{t.act || ''}}</span>${{t.event || ''}}</li>`
   ).join('');
-  tooltip.innerHTML = `
+  tooltipBody.innerHTML = `
     <h3>${{meta.label}}</h3>
     <div class="religion" style="background:${{meta.color}}">${{RELIGION_LABEL[meta.religion] || meta.religion}}</div>
     <div class="role">${{meta.role || ''}}</div>
     <div>${{meta.profile || ''}}</div>
     ${{tl ? `<div class="section-label">Entwicklung</div><ul class="timeline">${{tl}}</ul>` : ''}}
   `;
-  tooltip.style.display = 'block';
 }}
 
-function showEdgeTip(meta) {{
+function renderEdgeTip(meta) {{
   const fromName = (nodes.get(meta.from) || {{}}).label || meta.from;
   const toName = (nodes.get(meta.to) || {{}}).label || meta.to;
   const kindColor = KIND_COLOR[meta.kind] || '#95a5a6';
-  tooltip.innerHTML = `
+  tooltipBody.innerHTML = `
     <h3>${{fromName}} &rarr; ${{toName}}</h3>
     <div class="edge-kind" style="background:${{kindColor}}">${{KIND_LABEL[meta.kind] || meta.kind}}</div>
     <div class="role">${{meta.label || ''}}</div>
     <div>${{meta.description || ''}}</div>
   `;
-  tooltip.style.display = 'block';
 }}
 
-network.on('hoverNode', params => showNodeTip(nodes.get(params.node)._meta));
-network.on('blurNode', () => {{ tooltip.style.display = 'none'; }});
-network.on('hoverEdge', params => {{
-  const edge = edges.get(params.edge);
-  if (edge && edge._meta) showEdgeTip(edge._meta);
+function showTip(renderFn, pinned, pointer) {{
+  renderFn();
+  tooltip.style.display = 'block';
+  tipPinned = pinned;
+  tooltip.classList.toggle('pinned', pinned);
+  document.body.classList.toggle('tip-open', pinned && isTouchLike());
+  placeTooltip(pointer && pointer.clientX, pointer && pointer.clientY);
+}}
+
+network.on('hoverNode', params => {{
+  if (tipPinned || isTouchLike()) return;
+  const meta = nodes.get(params.node)._meta;
+  showTip(() => renderNodeTip(meta), false, params.event && params.event.center);
 }});
-network.on('blurEdge', () => {{ tooltip.style.display = 'none'; }});
+network.on('blurNode', () => {{ if (!tipPinned) tooltip.style.display = 'none'; }});
+network.on('hoverEdge', params => {{
+  if (tipPinned || isTouchLike()) return;
+  const edge = edges.get(params.edge);
+  if (edge && edge._meta) showTip(() => renderEdgeTip(edge._meta), false, params.event && params.event.center);
+}});
+network.on('blurEdge', () => {{ if (!tipPinned) tooltip.style.display = 'none'; }});
+
+network.on('click', params => {{
+  const pointer = params.pointer && params.pointer.DOM
+    ? {{ clientX: params.pointer.DOM.x, clientY: params.pointer.DOM.y }}
+    : null;
+  if (params.nodes && params.nodes.length) {{
+    const meta = nodes.get(params.nodes[0])._meta;
+    showTip(() => renderNodeTip(meta), true, pointer);
+  }} else if (params.edges && params.edges.length) {{
+    const edge = edges.get(params.edges[0]);
+    if (edge && edge._meta) showTip(() => renderEdgeTip(edge._meta), true, pointer);
+  }} else {{
+    closeTooltip();
+  }}
+}});
+
+tooltipClose.addEventListener('click', e => {{ e.stopPropagation(); closeTooltip(); }});
+document.addEventListener('keydown', e => {{ if (e.key === 'Escape') closeTooltip(); }});
 
 document.addEventListener('mousemove', e => {{
-  if (tooltip.style.display === 'block') {{
-    const x = Math.min(e.clientX + 16, window.innerWidth - tooltip.offsetWidth - 10);
-    const y = Math.min(e.clientY + 16, window.innerHeight - tooltip.offsetHeight - 10);
-    tooltip.style.left = x + 'px';
-    tooltip.style.top = y + 'px';
-  }}
+  if (tipPinned || isTouchLike()) return;
+  if (tooltip.style.display === 'block') placeTooltip(e.clientX, e.clientY);
+}});
+
+window.addEventListener('resize', () => {{
+  if (tooltip.style.display === 'block') placeTooltip();
 }});
 </script>
 </body>
@@ -429,30 +542,35 @@ document.addEventListener('mousemove', e => {{
 # --------------------------------------------------------------------------
 def main() -> None:
     load_dotenv(ROOT / ".env")
-    if not os.getenv("ANTHROPIC_API_KEY"):
-        sys.exit("ANTHROPIC_API_KEY nicht in .env gefunden.")
-    if not EPUB_PATH.exists():
-        sys.exit(f"EPUB nicht gefunden: {EPUB_PATH}")
 
-    print(f"Lese EPUB: {EPUB_PATH.name}")
-    text = extract_epub_text(EPUB_PATH)
-    print(f"  {len(text):,} Zeichen extrahiert.")
+    if OUT_JSON.exists():
+        print(f"Verwende vorhandene Graph-Daten: {OUT_JSON.name}")
+        final = json.loads(OUT_JSON.read_text(encoding="utf-8"))
+    else:
+        if not os.getenv("ANTHROPIC_API_KEY"):
+            sys.exit("ANTHROPIC_API_KEY nicht in .env gefunden.")
+        if not EPUB_PATH.exists():
+            sys.exit(f"EPUB nicht gefunden: {EPUB_PATH}")
 
-    chunks = chunk_text(text)
-    print(f"  In {len(chunks)} Chunks aufgeteilt (~{CHUNK_CHAR_SIZE} Zeichen).")
+        print(f"Lese EPUB: {EPUB_PATH.name}")
+        text = extract_epub_text(EPUB_PATH)
+        print(f"  {len(text):,} Zeichen extrahiert.")
 
-    client = Anthropic()
+        chunks = chunk_text(text)
+        print(f"  In {len(chunks)} Chunks aufgeteilt (~{CHUNK_CHAR_SIZE} Zeichen).")
 
-    print("Extrahiere Figuren/Beziehungen pro Chunk:")
-    partials: list[dict] = []
-    for i, ch in enumerate(chunks, 1):
-        partials.append(call_claude_extract(client, ch, i, len(chunks)))
+        client = Anthropic()
 
-    print("Konsolidiere alle Teilextraktionen:")
-    final = call_claude_merge(client, partials)
+        print("Extrahiere Figuren/Beziehungen pro Chunk:")
+        partials: list[dict] = []
+        for i, ch in enumerate(chunks, 1):
+            partials.append(call_claude_extract(client, ch, i, len(chunks)))
 
-    OUT_JSON.write_text(json.dumps(final, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"  JSON gespeichert: {OUT_JSON.name}")
+        print("Konsolidiere alle Teilextraktionen:")
+        final = call_claude_merge(client, partials)
+
+        OUT_JSON.write_text(json.dumps(final, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"  JSON gespeichert: {OUT_JSON.name}")
 
     OUT_HTML.write_text(build_html(final), encoding="utf-8")
     print(f"Fertig! HTML: {OUT_HTML.name}")
